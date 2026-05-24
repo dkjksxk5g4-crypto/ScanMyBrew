@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <title>Bryglog – Prototype</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #BF7F67;
+      padding: 1rem 1.5rem;
+      color: #111;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+    main {
+      padding: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      border-bottom: 1px solid #333;
+      padding-bottom: 0.3rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    input, textarea, select, button {
+      width: 100%;
+      margin-top: 0.2rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #1b1b1b;
+      color: #f5f5f5;
+      font-size: 0.9rem;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    button {
+      cursor: pointer;
+      background: #BF7F67;
+      color: #111;
+      border: none;
+      margin-top: 0.8rem;
+      font-weight: 600;
+    }
+    button:hover {
+      filter: brightness(1.05);
+    }
+    .brews-list {
+      margin-top: 0.5rem;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 0.5rem;
+      max-height: 260px;
+      overflow-y: auto;
+      background: #151515;
+    }
+    .brew-item {
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #333;
+      margin-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .brew-item:hover {
+      background: #222;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      border: 1px solid #555;
+    }
+    .thread {
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 0.8rem;
+      background: #151515;
+      margin-top: 0.5rem;
+    }
+    .thread-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .qr-box {
+      margin-top: 0.6rem;
+      padding: 0.6rem;
+      border-radius: 4px;
+      border: 1px dashed #555;
+      font-size: 0.8rem;
+      text-align: center;
+      color: #ccc;
+    }
+    .log-entry {
+      font-size: 0.85rem;
+      border-top: 1px solid #333;
+      padding-top: 0.4rem;
+      margin-top: 0.4rem;
+    }
+    .log-entry small {
+      color: #aaa;
+    }
+    .log-list {
+      max-height: 180px;
+      overflow-y: auto;
+      margin-top: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Bryglog – QR‑styret brygning (prototype)</h1>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- Opret bryg -->
+    <section>
+      <h2>Ny bryg</h2>
+      <form id="brewForm">
+        <label>
+          Navn på bryg
+          <input type="text" id="brewName" required placeholder="Fx IPA #3">
+        </label>
+        <label>
+          Opskrift / noter
+          <textarea id="brewRecipe" placeholder="Malt, humle, gær, tider osv."></textarea>
+        </label>
+        <label>
+          Start OG
+          <input type="number" step="0.001" id="brewOG" placeholder="Fx 1.050">
+        </label>
+        <label>
+          Gærtype
+          <input type="text" id="brewYeast" placeholder="Fx US-05">
+        </label>
+        <label>
+          Mærke (farvekode / tekst)
+          <input type="text" id="brewTag" placeholder="Fx Grøn, Batch 12, Rød prik">
+        </label>
+        <button type="submit">Opret bryg</button>
+      </form>
+    </section>
+
+    <!-- Liste over bryg -->
+    <section>
+      <h2>Dine bryg</h2>
+      <div class="brews-list" id="brewsList">
+        <p style="font-size:0.85rem;color:#aaa;margin:0;">
+          Ingen bryg endnu. Opret en til venstre.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Tråd for valgt bryg -->
+  <section>
+    <h2>Tråd for valgt bryg</h2>
+    <div class="thread" id="brewThread">
+      <p style="font-size:0.9rem;color:#aaa;margin:0;">
+        Vælg en bryg i listen for at se detaljer, QR‑kode og logbog.
+      </p>
+    </div>
+  </section>
+</main>
+
+<script>
+  const brews = [];
+  let selectedBrewId = null;
+
+  const brewForm = document.getElementById('brewForm');
+  const brewsList = document.getElementById('brewsList');
+  const brewThread = document.getElementById('brewThread');
+
+  brewForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const brew = {
+      id: Date.now().toString(),
+      name: document.getElementById('brewName').value.trim(),
+      recipe: document.getElementById('brewRecipe').value.trim(),
+      og: document.getElementById('brewOG').value.trim(),
+      yeast: document.getElementById('brewYeast').value.trim(),
+      tag: document.getElementById('brewTag').value.trim(),
+      status: 'Gæring',
+      logs: []
+    };
+    brews.push(brew);
+    brewForm.reset();
+    renderBrewsList();
+    selectBrew(brew.id);
+  });
+
+  function renderBrewsList() {
+    if (brews.length === 0) {
+      brewsList.innerHTML = '<p style="font-size:0.85rem;color:#aaa;margin:0;">Ingen bryg endnu. Opret en til venstre.</p>';
+      return;
+    }
+    brewsList.innerHTML = '';
+    brews.forEach(brew => {
+      const div = document.createElement('div');
+      div.className = 'brew-item';
+      div.onclick = () => selectBrew(brew.id);
+      div.innerHTML = `
+        <div>
+          <strong>${brew.name}</strong><br>
+          <small>Status: ${brew.status}</small>
+        </div>
+        <div>
+          ${brew.tag ? `<span class="badge">${brew.tag}</span>` : ''}
+        </div>
+      `;
+      brewsList.appendChild(div);
+    });
+  }
+
+  function selectBrew(id) {
+    const brew = brews.find(b => b.id === id);
+    if (!brew) return;
+    selectedBrewId = id;
+    renderBrewThread(brew);
+  }
+
+  function renderBrewThread(brew) {
+    const qrUrl = `https://dinapp.dk/brew.php?id=${brew.id}`;
+    brewThread.innerHTML = `
+      <div class="thread-header">
+        <div>
+          <strong>${brew.name}</strong><br>
+          <small>Status: ${brew.status}</small><br>
+          ${brew.tag ? `<span class="badge">${brew.tag}</span>` : ''}
+        </div>
+        <div style="font-size:0.8rem;color:#ccc;">
+          Start OG: ${brew.og || '-'}<br>
+          Gær: ${brew.yeast || '-'}
+        </div>
+      </div>
+
+      <div class="qr-box">
+        <div style="font-weight:600;margin-bottom:0.2rem;">QR‑kode (placeholder)</div>
+        <div style="font-size:0.75rem;word-break:break-all;">
+          ${qrUrl}
+        </div>
+        <div style="margin-top:0.3rem;font-size:0.75rem;color:#888;">
+          Her kan du senere indsætte en rigtig QR‑generator, der koder dette link.
+        </div>
+      </div>
+
+      <h3 style="font-size:1rem;margin-top:0.8rem;">Logbog</h3>
+      <form onsubmit="addLogEntry(event)">
+        <label style="font-size:0.8rem;">
+          SG
+          <input type="number" step="0.001" id="logSG" placeholder="Fx 1.012">
+        </label>
+        <label style="font-size:0.8rem;">
+          Temperatur (°C)
+          <input type="number" step="0.1" id="logTemp" placeholder="Fx 20.5">
+        </label>
+        <label style="font-size:0.8rem;">
+          Note
+          <textarea id="logNote" placeholder="Smag, aktivitet, ændringer osv."></textarea>
+        </label>
+        <button type="submit">Tilføj log</button>
+      </form>
+
+      <div class="log-list" id="logList">
+        ${brew.logs.length === 0
+          ? '<p style="font-size:0.8rem;color:#aaa;margin-top:0.4rem;">Ingen log endnu.</p>'
+          : brew.logs.map(logToHtml).join('')}
+      </div>
+    `;
+  }
+
+  function logToHtml(log) {
+    return `
+      <div class="log-entry">
+        <small>${log.date}</small><br>
+        SG: ${log.sg || '-'} | Temp: ${log.temp || '-'} °C<br>
+        ${log.note ? `<span>${log.note}</span>` : ''}
+      </div>
+    `;
+  }
+
+  window.addLogEntry = function (e) {
+    e.preventDefault();
+    const brew = brews.find(b => b.id === selectedBrewId);
+    if (!brew) return;
+
+    const sg = document.getElementById('logSG').value.trim();
+    const temp = document.getElementById('logTemp').value.trim();
+    const note = document.getElementById('logNote').value.trim();
+
+    if (!sg && !temp && !note) return;
+
+    brew.logs.unshift({
+      date: new Date().toLocaleString('da-DK'),
+      sg,
+      temp,
+      note
+    });
+
+    document.getElementById('logSG').value = '';
+    document.getElementById('logTemp').value = '';
+    document.getElementById('logNote').value = '';
+
+    renderBrewThread(brew);
+  };
+</script>
+</body>
+</html>
